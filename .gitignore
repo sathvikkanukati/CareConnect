@@ -1,0 +1,35 @@
+# Local secrets and credentials
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Python environments and caches
+venv/
+.venv/
+**/venv/
+**/.venv/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+
+# Node dependencies and generated output
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+build/
+**/build/
+
+# Local databases, uploads, and logs
+*.sqlite3
+*.log
+media/
+**/media/
+
+# Local reports and OS files
+ShareBite_Backend_Test_Report.xlsx
+.DS_Store
+Thumbs.db

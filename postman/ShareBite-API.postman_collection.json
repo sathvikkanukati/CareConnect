@@ -1,0 +1,92 @@
+{
+  "info": {
+    "_postman_id": "sharebite-local-api",
+    "name": "ShareBite API — Local Testing",
+    "description": "Register two test users (donor and NGO), authenticate, create a donation, request and accept a pickup, then verify its one-time QR token. Set baseUrl before running.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://127.0.0.1:8000/api" },
+    { "key": "accessToken", "value": "" },
+    { "key": "donorEmail", "value": "donor@example.com" },
+    { "key": "ngoEmail", "value": "ngo@example.com" },
+    { "key": "testPassword", "value": "ShareBiteDemo123!" },
+    { "key": "donationId", "value": "" },
+    { "key": "pickupId", "value": "" },
+    { "key": "qrToken", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Register donor",
+          "request": { "method": "POST", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{\n  \"name\": \"Demo Donor\",\n  \"email\": \"{{donorEmail}}\",\n  \"password\": \"{{testPassword}}\",\n  \"phone\": \"9876543210\",\n  \"city\": \"Bengaluru\",\n  \"role\": \"donor\"\n}"}, "url": "{{baseUrl}}/auth/register/" },
+          "event": [{"listen":"test","script":{"exec":["pm.test('Registration response is successful', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));"]}}]
+        },
+        {
+          "name": "Register NGO",
+          "request": { "method": "POST", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{\n  \"name\": \"Demo Community NGO\",\n  \"email\": \"{{ngoEmail}}\",\n  \"password\": \"{{testPassword}}\",\n  \"phone\": \"9876543211\",\n  \"city\": \"Bengaluru\",\n  \"role\": \"ngo\"\n}"}, "url": "{{baseUrl}}/auth/register/" }
+        },
+        {
+          "name": "Login donor (sets accessToken)",
+          "request": { "method": "POST", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{\n  \"email\": \"{{donorEmail}}\",\n  \"password\": \"{{testPassword}}\"\n}"}, "url": "{{baseUrl}}/auth/login/" },
+          "event": [{"listen":"test","script":{"exec":["const data = pm.response.json();","if (data.access) pm.collectionVariables.set('accessToken', data.access);","pm.test('Login returns access token', () => pm.expect(data).to.have.property('access'));","if (data.user) pm.collectionVariables.set('loggedInRole', data.user.role);"]}}]
+        },
+        {
+          "name": "Login NGO (sets accessToken)",
+          "request": { "method": "POST", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{\n  \"email\": \"{{ngoEmail}}\",\n  \"password\": \"{{testPassword}}\"\n}"}, "url": "{{baseUrl}}/auth/login/" },
+          "event": [{"listen":"test","script":{"exec":["const data = pm.response.json();","if (data.access) pm.collectionVariables.set('accessToken', data.access);","pm.test('Login returns access token', () => pm.expect(data).to.have.property('access'));"]}}]
+        },
+        {
+          "name": "Current user",
+          "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{accessToken}}"}], "url": "{{baseUrl}}/auth/me/" }
+        }
+      ]
+    },
+    {
+      "name": "Donations & pickup workflow",
+      "item": [
+        {
+          "name": "Create food donation (run as donor)",
+          "request": { "method": "POST", "header": [{"key":"Authorization","value":"Bearer {{accessToken}}"},{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{\n  \"donation_type\": \"food\",\n  \"title\": \"Fresh vegetable meal packs\",\n  \"category\": \"Cooked meal\",\n  \"description\": \"Freshly prepared meal packs for collection.\",\n  \"quantity\": 20,\n  \"quantity_unit\": \"servings\",\n  \"location\": \"Indiranagar, Bengaluru\",\n  \"expiry\": \"2030-12-31T18:00:00Z\"\n}"}, "url": "{{baseUrl}}/donations/" },
+          "event": [{"listen":"test","script":{"exec":["const data = pm.response.json();","if (data.id) pm.collectionVariables.set('donationId', data.id);","pm.test('Donation created', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));"]}}]
+        },
+        {
+          "name": "List available donations (run as NGO)",
+          "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{accessToken}}"}], "url": "{{baseUrl}}/donations/?status=available" }
+        },
+        {
+          "name": "Request pickup (run as NGO)",
+          "request": { "method": "POST", "header": [{"key":"Authorization","value":"Bearer {{accessToken}}"},{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{\n  \"donation\": {{donationId}},\n  \"message\": \"We can collect this donation today. Thank you!\"\n}"}, "url": "{{baseUrl}}/pickups/" },
+          "event": [{"listen":"test","script":{"exec":["const data = pm.response.json();","if (data.id) pm.collectionVariables.set('pickupId', data.id);","pm.test('Pickup request created', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));"]}}]
+        },
+        {
+          "name": "List pickup requests",
+          "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{accessToken}}"}], "url": "{{baseUrl}}/pickups/" }
+        },
+        {
+          "name": "Accept pickup (run as donor)",
+          "request": { "method": "POST", "header": [{"key":"Authorization","value":"Bearer {{accessToken}}"}], "url": "{{baseUrl}}/pickups/{{pickupId}}/accept/" }
+        },
+        {
+          "name": "Generate pickup QR (run as NGO)",
+          "request": { "method": "POST", "header": [{"key":"Authorization","value":"Bearer {{accessToken}}"}], "url": "{{baseUrl}}/pickups/{{pickupId}}/qr/" },
+          "event": [{"listen":"test","script":{"exec":["const data = pm.response.json();","if (data.token) pm.collectionVariables.set('qrToken', data.token);","pm.test('QR token returned', () => pm.expect(data).to.have.property('token'));"]}}]
+        },
+        {
+          "name": "Verify pickup QR (run as donor)",
+          "request": { "method": "POST", "header": [{"key":"Authorization","value":"Bearer {{accessToken}}"},{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{\n  \"token\": \"{{qrToken}}\"\n}"}, "url": "{{baseUrl}}/pickups/verify-qr/" }
+        }
+      ]
+    },
+    {
+      "name": "Needs & dashboard",
+      "item": [
+        {"name":"Dashboard stats","request":{"method":"GET","header":[{"key":"Authorization","value":"Bearer {{accessToken}}"}],"url":"{{baseUrl}}/stats/"}},
+        {"name":"List NGO needs","request":{"method":"GET","header":[{"key":"Authorization","value":"Bearer {{accessToken}}"}],"url":"{{baseUrl}}/needs/"}},
+        {"name":"Post NGO need (run as NGO)","request":{"method":"POST","header":[{"key":"Authorization","value":"Bearer {{accessToken}}"},{"key":"Content-Type","value":"application/json"}],"body":{"mode":"raw","raw":"{\n  \"need_type\": \"food\",\n  \"title\": \"Nutritious food packs\",\n  \"description\": \"Food packs for families this week.\",\n  \"quantity_needed\": 40,\n  \"urgency\": \"high\"\n}"},"url":"{{baseUrl}}/needs/"}}
+      ]
+    }
+  ]
+}
